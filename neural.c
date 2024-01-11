@@ -481,7 +481,7 @@ void backpropagateX(float *neural, int layers[], int layers_size, float target[]
     calculate_delta_w(neural, layers, layers_size, layer_index, target, target_index, learning_rate, momentum, propagated_value, 0);
 }
 
-float backpropagate(float *neural, int layers[], int layers_size, int layer_index, float target[], int target_index, float learning_rate, float momentum, int previous_layer_neuron_index){
+float backpropagateY(float *neural, int layers[], int layers_size, int layer_index, float target[], int target_index, float learning_rate, float momentum, int previous_layer_neuron_index){
     int is_output_layer = (layer_index == layers_size - 1);
     int neurons = layers[layer_index];
     float sum_delta_layer = 0;
@@ -523,7 +523,18 @@ float backpropagate(float *neural, int layers[], int layers_size, int layer_inde
     return sum_delta_layer;
 }
 
-float backpropagateY(float *neural, int layers[], int layers_size, int layer_index, float target[], int target_index, float learning_rate, float momentum, int previous_layer_neuron_index){
+float backpropagate(float *neural, int layers[], int layers_size, int layer_index, float target[], int target_index, float learning_rate, float momentum, int previous_layer_neuron_index){
+    int const k_size = layers[2];
+    int const j_size = layers[1];
+    int calculate_bias_k[k_size];
+    int calculate_bias_j[j_size];
+    for(int k = 0; k < layers[2]; k++){
+        calculate_bias_k[k] = 1;
+    }
+    for(int j = 0; j < layers[1]; j++){
+        calculate_bias_j[j] = 1;
+    }
+
     for(int i = 0; i < layers[0]; i++){
         float a_i = *(neural + a_position(layers, 0) + i);
         float sum_delta_j = 0;
@@ -539,15 +550,29 @@ float backpropagateY(float *neural, int layers[], int layers_size, int layer_ind
                 float w_k_j = *(neural + w_position(layers, 2, j, k));
                 sum_delta_k += delta_k * w_k_j;
                 w_k_j += delta_w_k_j;
-                *(neural + w_position(layers, 2, j, k)) = w_k_j;
-                *(neural + delta_w_position(layers, 2, j, k)) = delta_w_k_j;
 
-                float previous_delta_bias_k = *(neural + delta_bias_position(layers, 2));
-                float delta_bias_k = learning_rate * delta_k + momentum * previous_delta_bias_k;
-                float bias_k = *(neural + bias_position(layers, 2));
-                bias_k += delta_bias_k;
-                *(neural + bias_position(layers, 2)) = bias_k;
-                *(neural + delta_bias_position(layers, 2)) = delta_bias_k;
+                if(i == 0){
+                    *(neural + w_position(layers, 2, j, k)) = w_k_j;
+                    *(neural + delta_w_position(layers, 2, j, k)) = delta_w_k_j;
+                }
+
+                /*
+                    Bias is not dependent on j, so, the block below should be
+                    executed just once. Executing every interaction the previous_delta_bias_k
+                    interfere to the current delta bias, but maybe this is making the conversion
+                    be faster.
+                    It should be executed once per k within the whole backpropagation routine.
+                */
+               if(calculate_bias_k[k] == 1){
+                    float previous_delta_bias_k = *(neural + delta_bias_position(layers, 2) + k);
+                    float delta_bias_k = learning_rate * delta_k + momentum * previous_delta_bias_k;
+                    float bias_k = *(neural + bias_position(layers, 2) + k);
+                    bias_k += delta_bias_k;
+                    *(neural + bias_position(layers, 2) + k) = bias_k;
+                    *(neural + delta_bias_position(layers, 2) + k) = delta_bias_k;
+
+                    calculate_bias_k[k] = 0;
+               }
                 
                 
             }
@@ -560,12 +585,21 @@ float backpropagateY(float *neural, int layers[], int layers_size, int layer_ind
             *(neural + w_position(layers, 1, i, j)) = w_j_i;
             *(neural + delta_w_position(layers, 1, i, j)) = delta_w_j_i;
 
-            float previous_delta_bias_j = *(neural + delta_bias_position(layers, 1));
-            float delta_bias_j = learning_rate * delta_j + momentum * previous_delta_bias_j;
-            float bias_j = *(neural + bias_position(layers, 1));
-            bias_j += delta_bias_j;
-            *(neural + bias_position(layers, 1)) = bias_j;
-            *(neural + delta_bias_position(layers, 1)) = delta_bias_j;
+
+            /*
+                The same thing happens here, related to the bias_k, described above.
+                It should be executed once per j within the whole backpropagation routine.
+            */
+            if(calculate_bias_j[j] == 1){
+                float previous_delta_bias_j = *(neural + delta_bias_position(layers, 1) + j);
+                float delta_bias_j = learning_rate * delta_j + momentum * previous_delta_bias_j;
+                float bias_j = *(neural + bias_position(layers, 1) + j);
+                bias_j += delta_bias_j;
+                *(neural + bias_position(layers, 1) + j) = bias_j;
+                *(neural + delta_bias_position(layers, 1) + j) = delta_bias_j;
+
+                calculate_bias_j[j] = 0;
+            }
             
         }
     }
@@ -598,19 +632,21 @@ int main(int argument_count, char **arguments)
     float target[targets_size];
     load_target(target);
 
-    int const MAX_EPOCHS = 1000;
+    int const MAX_EPOCHS = 500;
     int const FIRST_LAYER_INDEX = 0;
     int const LAST_LAYER_INDEX = layers_size - 1;
+
+    int counter = 0;
     for (int epoch = 0; epoch < MAX_EPOCHS; epoch++)
     {
         for (int sample_index = 0; sample_index < samples_size; sample_index += sample_length)
         {
             propagate(neural, layers, FIRST_LAYER_INDEX, layers_size, data, sample_index, sample_length);
             int layer_index = 1;
-            for(int neuron_index_layer_zero = 0; neuron_index_layer_zero < layers[0]; neuron_index_layer_zero++){
-                // int neuron_index_layer_zero = 0;
+            // for(int neuron_index_layer_zero = 0; neuron_index_layer_zero < layers[0]; neuron_index_layer_zero++){
+                int neuron_index_layer_zero = 0;
                 backpropagate(neural, layers, layers_size, layer_index, target, sample_index/sample_length, LEARNING_RATE, MOMENTUM, neuron_index_layer_zero);    
-            }
+            // }
 
             int a_p = a_position(layers, layers_size - 1);
             float a = *(neural + a_p);
@@ -618,7 +654,8 @@ int main(int argument_count, char **arguments)
             int d0 = data[sample_index/sample_length];
             int d1 = data[sample_index/sample_length+1];
             float error = 1.0/2*(t - a)*(t - a);
-            printf("\nEpoch %i. Sample %d,%d. Target: %f. Calculated %f. Error %f.", epoch, d0, d1, t, a, error);
+            printf("\nCounter %i. Epoch %i. Sample %d,%d. Target: %f. Calculated %f. Error %f.", counter, epoch, d0, d1, t, a, error);
+            counter++;
 
         }
     }
