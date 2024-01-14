@@ -1,4 +1,6 @@
 neural
+output
+xor_samples_generation
 
 # Prerequisites
 *.d

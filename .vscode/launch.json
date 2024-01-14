@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${fileDirname}/${fileBasenameNoExtension}",
-            "args": [],
+            "args": ["./output/xor_samples.hex", "2", "./output/xor_targets.hex", "1"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
