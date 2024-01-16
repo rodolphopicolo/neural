@@ -596,12 +596,11 @@ int load_input(float **data, char *file_path, int length){
     FILE *input_file = fopen(file_path, "rb");
     int bytes_read;
     int count = 0;
-    float *d = *data;
     while((bytes_read = fread(sample, sizeof(float), length, input_file))==length){
 
-        if(buffer_size - buffer_next_free_position < bytes_read){
-             buffer_size += BUFFER_INCREMENT_SIZE;
-            buffer = realloc(buffer, buffer_size);
+        while(buffer_size - buffer_next_free_position < bytes_read){
+            buffer_size += BUFFER_INCREMENT_SIZE;
+            buffer = realloc(buffer, buffer_size * sizeof(float));
         }
 
         printf("\nSample %d: ", count);
@@ -618,21 +617,23 @@ int load_input(float **data, char *file_path, int length){
     }
     if(buffer_size > buffer_next_free_position){
         buffer_size = buffer_next_free_position;
-        buffer = realloc(buffer, buffer_size);
+        buffer = realloc(buffer, buffer_size * sizeof(buffer));
     }
+    *data = malloc(buffer_size * sizeof(float));
     *data = buffer;
+
     return count*length;
 }
 
 int main(int argument_count, char **arguments){
 
     struct arguments args = load_arguments(argument_count, arguments);
-    float *data_initializer = NULL;
+    float *data_initializer = malloc(1);
     float **data = &data_initializer;
     int samples_size = load_input(data, args.sample_file_path, args.sample_length);
     int sample_length = args.sample_length;
 
-    float *targets_initializer = NULL;
+    float *targets_initializer = malloc(1);
     float **targets = &targets_initializer;
     int targets_size = load_input(targets, args.target_file_path, args.target_length);
     int target_length = args.target_length;
@@ -648,7 +649,7 @@ int main(int argument_count, char **arguments){
     float *neural = malloc(neural_size * sizeof(float));
 
     initialize(neural, layers, layers_size);
-    initialize_with_debugable_values(neural, layers);
+    // initialize_with_debugable_values(neural, layers);
 
     // int samples_size = 8;
     // int sample_length = 2;
@@ -660,7 +661,7 @@ int main(int argument_count, char **arguments){
     // float targets[targets_size];
     // load_target(targets);
 
-    int const MAX_EPOCHS = 500;
+    int const MAX_EPOCHS = 10000;
     int const FIRST_LAYER_INDEX = 0;
     int const LAST_LAYER_INDEX = layers_size - 1;
 
@@ -691,8 +692,9 @@ int main(int argument_count, char **arguments){
                 float t = *(*targets + (sample_index/sample_length));
                 float d0 = *(*data + (sample_index/sample_length));
                 float d1 = *(*data + (sample_index/sample_length+1));
+                float d2 = *(*data + (sample_index/sample_length+2));
                 float error = 1.0/2*(t - a)*(t - a);
-                printf("\nCounter %d. Epoch %d. Sample %f,%f. Target: %f. Calculated %f. Error %.8f.\n", counter, epoch, d0, d1, t, a, error);
+                printf("\nCounter %d. Epoch %d. Sample %f,%f,%f. Target: %f. Calculated %f. Error %.8f.\n", counter, epoch, d0, d1, d2, t, a, error);
             }
             counter++;
 

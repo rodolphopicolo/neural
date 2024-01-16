@@ -1,6 +1,7 @@
 neural
 output
 xor_samples_generation
+x1_samples_generation
 
 # Prerequisites
 *.d
