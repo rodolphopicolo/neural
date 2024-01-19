@@ -30,5 +30,18 @@
             "MIMode": "lldb",
             "preLaunchTask": "C/C++: gcc arquivo de build ativo"
         }
+        ,{
+            "name": "Lamps",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${fileDirname}/${fileBasenameNoExtension}",
+            "args": ["./resource/dataset/dataset.bin", "921600", "./resource/dataset/target.bin", "1"],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "preLaunchTask": "C/C++: gcc arquivo de build ativo"
+        }        
     ]
 }

@@ -1,7 +1,9 @@
 neural
 output
+resource
 xor_samples_generation
 x1_samples_generation
+neural.dSYM
 
 # Prerequisites
 *.d
