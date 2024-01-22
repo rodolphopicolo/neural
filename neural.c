@@ -2,15 +2,17 @@
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
+#include <string.h>
 
 void load_data(float x[]);
+int load_layers(char* arg, int **layers);
 float activate(float net);
 float backpropagate(float *neural, int layers[], int layers_size, int layer_index, float **target, int target_index, float learning_rate, float momentum, int previous_layer_neuron_index, int layers_exit_check[]);
 float derivative_delta_E_delta_a(float *neural, int layers[], int layers_size, float **target, int target_index, int neuron_index);
 float derivative_delta_a_delta_net(float *neural, int layers[], int layer_index, int current_layer_neuron_index);
 float derivative_delta_net_delta_w(float *neural, int layers[], int layer_index, int previous_layer_neuron_index);
 float derivative_delta_net_delta_a(float *neural, int layers[], int layer_index, int previous_layer_neuron_index, int current_layer_neuron_index);
-void propagate(float *neural, int layers[], int layer_index, int layers_size, float **data, int sample_index, int sample_length);
+void feed_forward(float *neural, int layers[], int layer_index, int layers_size, float **data, int sample_index, int sample_length);
 void sample_to_first_layer(float *neural, int layers[], float **data, int sample_index, int sample_length);
 void calculate_net(float *neural, int layers[], int layer_index);
 void calculate_activation(float *neural, int layers[], int layer_index);
@@ -351,7 +353,7 @@ void initialize(float *neural, int layers[], int layers_size)
 
 
 
-void propagate(float *neural, int layers[], int layer_index, int layers_size, float **data, int sample_index, int sample_length)
+void feed_forward(float *neural, int layers[], int layer_index, int layers_size, float **data, int sample_index, int sample_length)
 {
     if (layer_index >= layers_size)
     {
@@ -371,7 +373,7 @@ void propagate(float *neural, int layers[], int layer_index, int layers_size, fl
     {
         return;
     }
-    propagate(neural, layers, layer_index + 1, layers_size, data, sample_index, sample_length);
+    feed_forward(neural, layers, layer_index + 1, layers_size, data, sample_index, sample_length);
 }
 
 
@@ -434,10 +436,12 @@ struct arguments {
     int sample_length;
     char *target_file_path;
     int target_length;
+    int *layers;
+    int layers_size;
 };
 
 struct arguments load_arguments(int argument_count, char **arguments){
-    printf("\n\n");
+    // printf("\n\n");
     if(argument_count < 5){
         fprintf(stderr, "\nArguments required: samples file path, sample length, targets file path, target length. Exiting...\n");
         exit(EXIT_FAILURE);
@@ -447,7 +451,7 @@ struct arguments load_arguments(int argument_count, char **arguments){
     struct arguments args;
     for(int i = 1; i < argument_count; i++){
         char *arg = arguments[i];
-        printf("\nArgument %d: [%s].", i, arg);
+        // printf("\nArgument %d: [%s].", i, arg);
 
         if(i == 1){
             args.sample_file_path = arg;
@@ -457,44 +461,83 @@ struct arguments load_arguments(int argument_count, char **arguments){
             args.target_file_path = arg;
         } else if(i == 4){
             args.target_length = strtol(arg, &string_part, BASE);
+        } else if(i == 5){
+            int *initializer = NULL;
+            int **layers = &initializer;
+            args.layers_size = load_layers(arg, layers);
+            args.layers = *layers;
         }
 
     }
-    printf("\n\n");
+    // printf("\n\n");
     return args;
 }
 
-int load_input(float **data, char *file_path, int length){
-    const int BUFFER_INCREMENT_SIZE = 921600 * 100;
-    float *buffer = malloc(BUFFER_INCREMENT_SIZE);
-    int buffer_size = BUFFER_INCREMENT_SIZE;
-    int buffer_next_free_position = 0;
-    float sample[length];
+int load_layers(char* arg, int **layers){
+    int layers_size = 0;
+    int length = strlen(arg);
+    *layers = malloc(sizeof(int)*length);
+    char *str_number = malloc(32);
+    int number_length = 0;
+    for(int i = 0; i < length; i++){
+        char c = *(arg + i); 
+        if(c == ','){
+            int neurons = atoi(str_number);
+            *(*layers + layers_size) = neurons;
+            layers_size++;
+            number_length = 0;
+        } else if (number_length == 0){
+            strcpy(str_number, &c);
+            number_length++;
+        } else {
+            *(str_number + number_length) = c;
+            number_length++;
+        }
+    }
+    int neurons = atoi(str_number);
+    *(*layers + layers_size) = neurons;
+    layers_size++;
+    *layers = realloc(*layers, layers_size * sizeof(int));
+
+    return layers_size;
+}
+
+int load_input(float **data, char *file_path, int sample_length_float){
+    int BUFFER_INCREMENT_SIZE_FLOAT = sample_length_float;
+    int BUFFER_INCREMENT_SIZE_BYTES = BUFFER_INCREMENT_SIZE_FLOAT * sizeof(float);
+    float *buffer = malloc(BUFFER_INCREMENT_SIZE_BYTES);
+    int buffer_size_float = BUFFER_INCREMENT_SIZE_FLOAT;
+    int buffer_next_free_position_float = 0;
+    float sample[sample_length_float];
     FILE *input_file = fopen(file_path, "rb");
-    int bytes_read;
+    int floats_read;
     int count = 0;
-    while((bytes_read = fread(sample, sizeof(float), length, input_file))>0){
 
-        while(buffer_size - buffer_next_free_position < bytes_read){
-            buffer_size += BUFFER_INCREMENT_SIZE;
-            buffer = realloc(buffer, buffer_size * sizeof(float));
+    while((floats_read = fread(sample, sizeof(float), sample_length_float, input_file))>0){
+        if(floats_read != sample_length_float){
+            printf("Read bytes is diferent of sample length");
+            exit(EXIT_FAILURE);
         }
-
-        for(int i = 0; i < length; i++){
-            *(buffer + length * count + i) = sample[i];
+        
+        while(buffer_size_float - buffer_next_free_position_float < floats_read){
+            buffer_size_float += BUFFER_INCREMENT_SIZE_FLOAT;
+            buffer = realloc(buffer, buffer_size_float * sizeof(float));
         }
-        buffer_next_free_position += bytes_read;
+        for(int i = 0; i < floats_read; i++){
+            *(buffer + buffer_next_free_position_float + i) = sample[i];
+        }
+        buffer_next_free_position_float += floats_read;
         count++;
         
     }
-    if(buffer_size > buffer_next_free_position){
-        buffer_size = buffer_next_free_position;
-        buffer = realloc(buffer, buffer_size * sizeof(buffer));
+    if(buffer_size_float > buffer_next_free_position_float){
+        buffer_size_float = buffer_next_free_position_float;
+        buffer = realloc(buffer, buffer_size_float * sizeof(float));
     }
-    *data = malloc(buffer_size * sizeof(float));
+    *data = malloc(buffer_size_float * sizeof(float));
     *data = buffer;
 
-    return count*length;
+    return buffer_next_free_position_float;
 }
 
 int main(int argument_count, char **arguments){
@@ -510,8 +553,18 @@ int main(int argument_count, char **arguments){
     int targets_size = load_input(targets, args.target_file_path, args.target_length);
     int target_length = args.target_length;
 
-    int layers[3] = {921600, 3, 1};//{921600, 3, 1};
-    int layers_size = sizeof(layers) / sizeof(layers[0]);
+    for(int i = 0; i < targets_size; i++){
+        float target = *(*targets + i);
+        // printf("\nTarget %d: %f", i, target);
+    }
+
+    int const layers_size = args.layers_size;
+    int layers[layers_size];
+    // int *l = args.layers;
+    for(int i = 0; i < layers_size; i++){
+        layers[i] = *(args.layers + i);
+    }
+    
 
 
     float LEARNING_RATE = 0.45;
@@ -544,7 +597,7 @@ int main(int argument_count, char **arguments){
         {
             int target_index = sample_index/sample_length;
 
-            propagate(neural, layers, FIRST_LAYER_INDEX, layers_size, data, sample_index, sample_length);
+            feed_forward(neural, layers, FIRST_LAYER_INDEX, layers_size, data, sample_index, sample_length);
 
             int layers_exit_check[layers_size];
             for(int layer = 0; layer < layers_size; layer++){
