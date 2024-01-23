@@ -379,58 +379,6 @@ void feed_forward(float *neural, int layers[], int layer_index, int layers_size,
 
 
 
-float backpropagate(float *neural, int layers[], int layers_size, int layer_index, float **target, int target_index, float learning_rate, float momentum, int previous_layer_neuron_index, int layers_exit_check[]){
-    int is_output_layer = (layer_index == layers_size - 1);
-    int neurons = layers[layer_index];
-    float sum_delta_layer = 0;
-    for(int neuron_index = 0; neuron_index < neurons; neuron_index++){
-        float delta_a_delta_net = derivative_delta_a_delta_net(neural, layers, layer_index, neuron_index);
-        float delta_layer;
-        if(is_output_layer == 1){
-            float delta_E_delta_a = derivative_delta_E_delta_a(neural, layers, layers_size, target, target_index, neuron_index);    
-            delta_layer = delta_E_delta_a * delta_a_delta_net;
-        } else {
-            float sum_next_delta_layer = backpropagate(neural, layers, layers_size, layer_index+1, target, target_index, learning_rate, momentum, neuron_index, layers_exit_check);
-            delta_layer = sum_next_delta_layer * delta_a_delta_net;
-        }
-        float delta_net_delta_w = derivative_delta_net_delta_w(neural, layers, layer_index, previous_layer_neuron_index);
-
-        int delta_w_p = delta_w_position(layers, layer_index, previous_layer_neuron_index, neuron_index);
-        float previous_delta_w = *(neural + delta_w_p);
-
-        float delta_w = -learning_rate * delta_layer * delta_net_delta_w + momentum * previous_delta_w;
-        int w_p = w_position(layers, layer_index, previous_layer_neuron_index, neuron_index);
-        float w = *(neural + w_p);
-        w = w + delta_w;
-
-        if(layers_exit_check[layer_index-1] == 0){
-            // printf("\nw:%f, delta_w:%f\n", w, delta_w);
-            *(neural + w_p) = w;
-            *(neural + delta_w_p) = delta_w;
-        }
-
-
-        if(layers_exit_check[layer_index] == 0){
-            int delta_bias_p = delta_bias_position(layers, layer_index);
-            float previous_delta_bias = *(neural + delta_bias_p + neuron_index);
-            float delta_bias = -learning_rate * delta_layer * 1 + momentum * previous_delta_bias;
-            int bias_p = bias_position(layers, layer_index);
-            float bias = *(neural + bias_p + neuron_index);
-            bias = bias + delta_bias;
-            // printf("\nbias:%f, delta_bias:%f\n", bias, delta_bias);
-            *(neural + bias_p + neuron_index) = bias;
-            *(neural + delta_bias_p + neuron_index) = delta_bias;
-        }
-
-        float delta_net_delta_a = derivative_delta_net_delta_a(neural, layers, layer_index, previous_layer_neuron_index, neuron_index);
-        sum_delta_layer += delta_layer * delta_net_delta_a;
-    }
-
-    layers_exit_check[layer_index] = 1;
-    return sum_delta_layer;
-}
-
-
 struct arguments {
     char *sample_file_path;
     int sample_length;
@@ -540,6 +488,79 @@ int load_input(float **data, char *file_path, int sample_length_float){
     return buffer_next_free_position_float;
 }
 
+void show_results(float *neural, float **data, float **targets, int layers[], int layers_size, int sample_index, int sample_length, int counter, int epoch){
+    int a_p = a_position(layers, layers_size - 1);
+    float error = 0;
+    float a;
+    float t;
+    for(int neuron = 0; neuron < layers[layers_size - 1]; neuron++){
+        a = *(neural + a_p + neuron);
+        t = *(*targets + (sample_index/sample_length) + neuron);
+        float e = pow((t-a), 2)/2;
+        error += e;
+    }
+
+    float d0 = *(*data + (sample_index/sample_length));
+    float d1 = *(*data + (sample_index/sample_length+1));
+    float d2 = *(*data + (sample_index/sample_length+2));
+    // float error = 1.0/2*(t - a)*(t - a);            
+    printf("\nCounter %d. Epoch %d. Sample %f,%f,%f. Target: %f. Calculated %f. Error %.8f.", counter, epoch, d0, d1, d2, t, a, error);
+}
+
+
+float backpropagate(float *neural, int layers[], int layers_size, int layer_index, float **target, int target_index, float learning_rate, float momentum, int previous_layer_neuron_index, int layers_exit_check[]){
+    int is_output_layer = (layer_index == layers_size - 1);
+    int neurons = layers[layer_index];
+    float sum_delta_layer = 0;
+    for(int neuron_index = 0; neuron_index < neurons; neuron_index++){
+        
+        float delta_layer;
+        if(is_output_layer == 1){
+            float delta_E_delta_a = derivative_delta_E_delta_a(neural, layers, layers_size, target, target_index, neuron_index);    
+            delta_layer = delta_E_delta_a;
+        } else {
+            float sum_next_delta_layer = backpropagate(neural, layers, layers_size, layer_index+1, target, target_index, learning_rate, momentum, neuron_index, layers_exit_check);
+            delta_layer = sum_next_delta_layer;
+        }
+        float delta_a_delta_net = derivative_delta_a_delta_net(neural, layers, layer_index, neuron_index);
+        delta_layer = delta_layer * delta_a_delta_net;
+        
+
+        if(layers_exit_check[layer_index-1] == 0){
+            int delta_w_p = delta_w_position(layers, layer_index, previous_layer_neuron_index, neuron_index);
+            float previous_delta_w = *(neural + delta_w_p);
+            float delta_net_delta_w = derivative_delta_net_delta_w(neural, layers, layer_index, previous_layer_neuron_index);   
+            float delta_w = -learning_rate * delta_layer * delta_net_delta_w + momentum * previous_delta_w;
+            int w_p = w_position(layers, layer_index, previous_layer_neuron_index, neuron_index);
+            float w = *(neural + w_p);
+            w = w + delta_w;            
+            // printf("\nw:%f, delta_w:%f\n", w, delta_w);
+            *(neural + w_p) = w;
+            *(neural + delta_w_p) = delta_w;
+        }
+
+
+        if(layers_exit_check[layer_index] == 0){
+            int delta_bias_p = delta_bias_position(layers, layer_index);
+            float previous_delta_bias = *(neural + delta_bias_p + neuron_index);
+            float delta_bias = -learning_rate * delta_layer * 1 + momentum * previous_delta_bias;
+            int bias_p = bias_position(layers, layer_index);
+            float bias = *(neural + bias_p + neuron_index);
+            bias = bias + delta_bias;
+            // printf("\nbias:%f, delta_bias:%f\n", bias, delta_bias);
+            *(neural + bias_p + neuron_index) = bias;
+            *(neural + delta_bias_p + neuron_index) = delta_bias;
+        }
+
+        float delta_net_delta_a = derivative_delta_net_delta_a(neural, layers, layer_index, previous_layer_neuron_index, neuron_index);
+        sum_delta_layer += delta_layer * delta_net_delta_a;
+    }
+
+    layers_exit_check[layer_index] = 1;
+    return sum_delta_layer;
+}
+
+
 int main(int argument_count, char **arguments){
 
     struct arguments args = load_arguments(argument_count, arguments);
@@ -555,36 +576,25 @@ int main(int argument_count, char **arguments){
 
     for(int i = 0; i < targets_size; i++){
         float target = *(*targets + i);
-        // printf("\nTarget %d: %f", i, target);
     }
 
     int const layers_size = args.layers_size;
     int layers[layers_size];
-    // int *l = args.layers;
+
     for(int i = 0; i < layers_size; i++){
         layers[i] = *(args.layers + i);
     }
     
 
 
-    float LEARNING_RATE = 0.45;
-    float MOMENTUM = 0.9;
+    float LEARNING_RATE = 0.9;
+    float MOMENTUM = 0.2;
 
     int neural_size = calculate_size(layers, layers_size);
     float *neural = malloc(neural_size * sizeof(float));
 
     initialize(neural, layers, layers_size);
     // initialize_with_debugable_values(neural, layers);
-
-    // int samples_size = 8;
-    // int sample_length = 2;
-    // float data[samples_size];
-    // load_data(data);
-
-    // int targets_size = 4;
-    // int target_length = 1;
-    // float targets[targets_size];
-    // load_target(targets);
 
     int const MAX_EPOCHS = 1000;
     int const FIRST_LAYER_INDEX = 0;
@@ -611,16 +621,12 @@ int main(int argument_count, char **arguments){
                 backpropagate(neural, layers, layers_size, LAYER_INDEX, targets, target_index, LEARNING_RATE, MOMENTUM, neuron_index_layer_zero, layers_exit_check);    
             }
 
-            if(epoch == MAX_EPOCHS - 1 || epoch > -1){
-                int a_p = a_position(layers, layers_size - 1);
-                float a = *(neural + a_p);
-                float t = *(*targets + (sample_index/sample_length));
-                float d0 = *(*data + (sample_index/sample_length));
-                float d1 = *(*data + (sample_index/sample_length+1));
-                float d2 = *(*data + (sample_index/sample_length+2));
-                float error = 1.0/2*(t - a)*(t - a);
-                printf("\nCounter %d. Epoch %d. Sample %f,%f,%f. Target: %f. Calculated %f. Error %.8f.", counter, epoch, d0, d1, d2, t, a, error);
+            if(counter % 10 == 0){
+                show_results(neural, data, targets, layers, layers_size, sample_index, sample_length, counter, epoch);
             }
+            
+ 
+
             counter++;
 
         }
