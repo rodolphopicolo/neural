@@ -5,9 +5,10 @@
 #include <string.h>
 
 void load_data(float x[]);
-int load_layers(char* arg, int **layers);
+int load_layers(char *arg, int **layers);
 float activate(float net);
-float backpropagate(float *neural, int layers[], int layers_size, int layer_index, float **target, int target_index, float learning_rate, float momentum, int previous_layer_neuron_index, int layers_exit_check[]);
+void call_backpropagation_first_to_last(float *neural, int layers[], int layers_size, float **targets, int target_index, float learning_rate, float momentum);
+float backpropagate_first_to_last(float *neural, int layers[], int layers_size, int layer_index, float **target, int target_index, float learning_rate, float momentum, int previous_layer_neuron_index, int layers_exit_check[]);
 float derivative_delta_E_delta_a(float *neural, int layers[], int layers_size, float **target, int target_index, int neuron_index);
 float derivative_delta_a_delta_net(float *neural, int layers[], int layer_index, int current_layer_neuron_index);
 float derivative_delta_net_delta_w(float *neural, int layers[], int layer_index, int previous_layer_neuron_index);
@@ -30,6 +31,8 @@ int delta_w_position(int layers[], int layer_index, int previous_layer_neuron_in
 int delta_w_size(int layers[], int layer_index);
 int delta_bias_position(int layers[], int layer_index);
 int delta_bias_size(int layers[], int layer_index);
+int delta_residual_size(int layers[], int layer_index);
+int delta_residual_position(int layers[], int layer_index);
 void initialize(float *neural, int layers[], int layers_size);
 
 float derivative_delta_E_delta_a(float *neural, int layers[], int layers_size, float **target, int target_index, int neuron_index)
@@ -40,11 +43,12 @@ float derivative_delta_E_delta_a(float *neural, int layers[], int layers_size, f
     float a = *(neural + a_p + neuron_index);
     float t = *(*target + target_index + neuron_index);
     float delta_E_delta_a = -(t - a);
-    
+
     return delta_E_delta_a;
 }
 
-float derivative_delta_a_delta_net(float *neural, int layers[], int layer_index, int current_layer_neuron_index){
+float derivative_delta_a_delta_net(float *neural, int layers[], int layer_index, int current_layer_neuron_index)
+{
     int a_p = a_position(layers, layer_index) + current_layer_neuron_index;
     float a = *(neural + a_p);
     float delta_a_delta_net = (1 - a) * a;
@@ -64,7 +68,6 @@ float derivative_delta_net_delta_a(float *neural, int layers[], int layer_index,
     float delta_net_delta_a = *(neural + w_p);
     return delta_net_delta_a;
 }
-
 
 float activate(float net)
 {
@@ -146,8 +149,9 @@ int layer_size(int layers[], int layer_index)
     int delta_bias = delta_bias_size(layers, layer_index);
     int net = net_size(layers, layer_index);
     int a = a_size(layers, layer_index);
+    int delta_residual = delta_residual_size(layers, layer_index);
 
-    int size = w + delta_w + bias + delta_bias + net + a;
+    int size = w + delta_w + bias + delta_bias + net + a + delta_residual;
     return size;
 }
 
@@ -310,9 +314,38 @@ int a_position(int layers[], int layer_index)
     size_before += net_size(layers, layer_index);
     return size_before;
 }
+
 int a_size(int layers[], int layer_index)
 {
     return layers[layer_index];
+}
+
+
+
+int delta_residual_size(int layers[], int layer_index)
+{
+    return layers[layer_index];
+}
+
+int delta_residual_position(int layers[], int layer_index)
+{
+    if (layer_index == 0)
+    {
+        return 0;
+    }
+    int size_before = 0;
+    for (int i = 0; i < layer_index; i++)
+    {
+        size_before += layer_size(layers, i);
+    }
+    size_before += w_size(layers, layer_index);
+    size_before += delta_w_size(layers, layer_index);
+    size_before += bias_size(layers, layer_index);
+    size_before += delta_bias_size(layers, layer_index);
+    size_before += net_size(layers, layer_index);
+    size_before += a_size(layers, layer_index);
+
+    return size_before;
 }
 
 void initialize(float *neural, int layers[], int layers_size)
@@ -351,8 +384,6 @@ void initialize(float *neural, int layers[], int layers_size)
     }
 }
 
-
-
 void feed_forward(float *neural, int layers[], int layer_index, int layers_size, float **data, int sample_index, int sample_length)
 {
     if (layer_index >= layers_size)
@@ -376,10 +407,8 @@ void feed_forward(float *neural, int layers[], int layer_index, int layers_size,
     feed_forward(neural, layers, layer_index + 1, layers_size, data, sample_index, sample_length);
 }
 
-
-
-
-struct arguments {
+struct arguments
+{
     char *sample_file_path;
     int sample_length;
     char *target_file_path;
@@ -388,56 +417,70 @@ struct arguments {
     int layers_size;
 };
 
-struct arguments load_arguments(int argument_count, char **arguments){
-    // printf("\n\n");
-    if(argument_count < 5){
+struct arguments load_arguments(int argument_count, char **arguments)
+{
+    if (argument_count < 5)
+    {
         fprintf(stderr, "\nArguments required: samples file path, sample length, targets file path, target length. Exiting...\n");
         exit(EXIT_FAILURE);
     }
     char *string_part;
     const int BASE = 10;
     struct arguments args;
-    for(int i = 1; i < argument_count; i++){
+    for (int i = 1; i < argument_count; i++)
+    {
         char *arg = arguments[i];
-        // printf("\nArgument %d: [%s].", i, arg);
-
-        if(i == 1){
+        if (i == 1)
+        {
             args.sample_file_path = arg;
-        } else if(i == 2){
+        }
+        else if (i == 2)
+        {
             args.sample_length = strtol(arg, &string_part, BASE);
-        } else if(i == 3){
+        }
+        else if (i == 3)
+        {
             args.target_file_path = arg;
-        } else if(i == 4){
+        }
+        else if (i == 4)
+        {
             args.target_length = strtol(arg, &string_part, BASE);
-        } else if(i == 5){
+        }
+        else if (i == 5)
+        {
             int *initializer = NULL;
             int **layers = &initializer;
             args.layers_size = load_layers(arg, layers);
             args.layers = *layers;
         }
-
     }
-    // printf("\n\n");
     return args;
 }
 
-int load_layers(char* arg, int **layers){
+int load_layers(char *arg, int **layers)
+{
     int layers_size = 0;
     int length = strlen(arg);
-    *layers = malloc(sizeof(int)*length);
+    *layers = malloc(sizeof(int) * length);
     char *str_number = malloc(32);
     int number_length = 0;
-    for(int i = 0; i < length; i++){
-        char c = *(arg + i); 
-        if(c == ','){
+    for (int i = 0; i < length; i++)
+    {
+        char c = *(arg + i);
+        if (c == ',')
+        {
             int neurons = atoi(str_number);
             *(*layers + layers_size) = neurons;
             layers_size++;
             number_length = 0;
-        } else if (number_length == 0){
+        }
+        else if (number_length == 0)
+        {
             strcpy(str_number, &c);
             number_length++;
-        } else {
+        }
+        else
+        {
             *(str_number + number_length) = c;
             number_length++;
         }
@@ -450,7 +493,8 @@ int load_layers(char* arg, int **layers){
     return layers_size;
 }
 
-int load_input(float **data, char *file_path, int sample_length_float){
+int load_input(float **data, char *file_path, int sample_length_float)
+{
     int BUFFER_INCREMENT_SIZE_FLOAT = sample_length_float;
     int BUFFER_INCREMENT_SIZE_BYTES = BUFFER_INCREMENT_SIZE_FLOAT * sizeof(float);
     float *buffer = malloc(BUFFER_INCREMENT_SIZE_BYTES);
@@ -461,24 +505,28 @@ int load_input(float **data, char *file_path, int sample_length_float){
     int floats_read;
     int count = 0;
 
-    while((floats_read = fread(sample, sizeof(float), sample_length_float, input_file))>0){
-        if(floats_read != sample_length_float){
+    while ((floats_read = fread(sample, sizeof(float), sample_length_float, input_file)) > 0)
+    {
+        if (floats_read != sample_length_float)
+        {
             printf("Read bytes is diferent of sample length");
             exit(EXIT_FAILURE);
         }
-        
-        while(buffer_size_float - buffer_next_free_position_float < floats_read){
+
+        while (buffer_size_float - buffer_next_free_position_float < floats_read)
+        {
             buffer_size_float += BUFFER_INCREMENT_SIZE_FLOAT;
             buffer = realloc(buffer, buffer_size_float * sizeof(float));
         }
-        for(int i = 0; i < floats_read; i++){
+        for (int i = 0; i < floats_read; i++)
+        {
             *(buffer + buffer_next_free_position_float + i) = sample[i];
         }
         buffer_next_free_position_float += floats_read;
         count++;
-        
     }
-    if(buffer_size_float > buffer_next_free_position_float){
+    if (buffer_size_float > buffer_next_free_position_float)
+    {
         buffer_size_float = buffer_next_free_position_float;
         buffer = realloc(buffer, buffer_size_float * sizeof(float));
     }
@@ -488,59 +536,63 @@ int load_input(float **data, char *file_path, int sample_length_float){
     return buffer_next_free_position_float;
 }
 
-void show_results(float *neural, float **data, float **targets, int layers[], int layers_size, int sample_index, int sample_length, int counter, int epoch){
+void show_results(float *neural, float **data, float **targets, int layers[], int layers_size, int sample_index, int sample_length, int counter, int epoch)
+{
     int a_p = a_position(layers, layers_size - 1);
     float error = 0;
     float a;
     float t;
-    for(int neuron = 0; neuron < layers[layers_size - 1]; neuron++){
+    for (int neuron = 0; neuron < layers[layers_size - 1]; neuron++)
+    {
         a = *(neural + a_p + neuron);
-        t = *(*targets + (sample_index/sample_length) + neuron);
-        float e = pow((t-a), 2)/2;
+        t = *(*targets + (sample_index / sample_length) + neuron);
+        float e = pow((t - a), 2) / 2;
         error += e;
     }
-
-    float d0 = *(*data + (sample_index/sample_length));
-    float d1 = *(*data + (sample_index/sample_length+1));
-    float d2 = *(*data + (sample_index/sample_length+2));
-    // float error = 1.0/2*(t - a)*(t - a);            
+    float d0 = *(*data + sample_index + 0);
+    float d1 = *(*data + sample_index + 1);
+    float d2 = *(*data + sample_index + 2);
     printf("\nCounter %d. Epoch %d. Sample %f,%f,%f. Target: %f. Calculated %f. Error %.8f.", counter, epoch, d0, d1, d2, t, a, error);
 }
 
-
-float backpropagate(float *neural, int layers[], int layers_size, int layer_index, float **target, int target_index, float learning_rate, float momentum, int previous_layer_neuron_index, int layers_exit_check[]){
+float backpropagate_first_to_last(float *neural, int layers[], int layers_size, int layer_index, float **target, int target_index, float learning_rate, float momentum, int previous_layer_neuron_index, int layers_exit_check[])
+{
     int is_output_layer = (layer_index == layers_size - 1);
     int neurons = layers[layer_index];
     float sum_delta_layer = 0;
-    for(int neuron_index = 0; neuron_index < neurons; neuron_index++){
-        
+    for (int neuron_index = 0; neuron_index < neurons; neuron_index++)
+    {
+
         float delta_layer;
-        if(is_output_layer == 1){
-            float delta_E_delta_a = derivative_delta_E_delta_a(neural, layers, layers_size, target, target_index, neuron_index);    
+        if (is_output_layer == 1)
+        {
+            float delta_E_delta_a = derivative_delta_E_delta_a(neural, layers, layers_size, target, target_index, neuron_index);
             delta_layer = delta_E_delta_a;
-        } else {
-            float sum_next_delta_layer = backpropagate(neural, layers, layers_size, layer_index+1, target, target_index, learning_rate, momentum, neuron_index, layers_exit_check);
+        }
+        else
+        {
+            float sum_next_delta_layer = backpropagate_first_to_last(neural, layers, layers_size, layer_index + 1, target, target_index, learning_rate, momentum, neuron_index, layers_exit_check);
             delta_layer = sum_next_delta_layer;
         }
         float delta_a_delta_net = derivative_delta_a_delta_net(neural, layers, layer_index, neuron_index);
         delta_layer = delta_layer * delta_a_delta_net;
-        
 
-        if(layers_exit_check[layer_index-1] == 0){
+        if (layers_exit_check[layer_index - 1] == 0)
+        {
             int delta_w_p = delta_w_position(layers, layer_index, previous_layer_neuron_index, neuron_index);
             float previous_delta_w = *(neural + delta_w_p);
-            float delta_net_delta_w = derivative_delta_net_delta_w(neural, layers, layer_index, previous_layer_neuron_index);   
+            float delta_net_delta_w = derivative_delta_net_delta_w(neural, layers, layer_index, previous_layer_neuron_index);
             float delta_w = -learning_rate * delta_layer * delta_net_delta_w + momentum * previous_delta_w;
             int w_p = w_position(layers, layer_index, previous_layer_neuron_index, neuron_index);
             float w = *(neural + w_p);
-            w = w + delta_w;            
+            w = w + delta_w;
             // printf("\nw:%f, delta_w:%f\n", w, delta_w);
             *(neural + w_p) = w;
             *(neural + delta_w_p) = delta_w;
         }
 
-
-        if(layers_exit_check[layer_index] == 0){
+        if (layers_exit_check[layer_index] == 0)
+        {
             int delta_bias_p = delta_bias_position(layers, layer_index);
             float previous_delta_bias = *(neural + delta_bias_p + neuron_index);
             float delta_bias = -learning_rate * delta_layer * 1 + momentum * previous_delta_bias;
@@ -560,8 +612,93 @@ float backpropagate(float *neural, int layers[], int layers_size, int layer_inde
     return sum_delta_layer;
 }
 
+void call_backpropagation_first_to_last(float *neural, int layers[], int layers_size, float **targets, int target_index, float learning_rate, float momentum)
+{
+    int layers_exit_check[layers_size];
+    for (int layer = 0; layer < layers_size; layer++)
+    {
+        layers_exit_check[layer] = 0;
+    }
 
-int main(int argument_count, char **arguments){
+    int const LAYER_INDEX = 1;
+    for (int neuron_index_layer_zero = 0; neuron_index_layer_zero < layers[0]; neuron_index_layer_zero++)
+    {
+        backpropagate_first_to_last(neural, layers, layers_size, LAYER_INDEX, targets, target_index, learning_rate, momentum, neuron_index_layer_zero, layers_exit_check);
+    }
+}
+
+void save()
+{
+    //TODO
+}
+
+void restore()
+{
+    //TODO
+}
+
+// void backpropagate_last_to_first(float *neural, int layers[], int layers_size, int layer_index, float **target, int target_index, float learning_rate, float momentum, float sum_next_delta_layer)
+// {
+
+//     if(layer_index == 0){
+//         return;
+//     }
+
+//     int is_output_layer = (layer_index == layers_size - 1);
+//     int neurons = layers[layer_index];
+//     int previous_layer_neurons = layers[layer_index - 1];
+
+//     float sum_delta_layer = 0;
+//     for (int neuron_index = 0; neuron_index < neurons; neuron_index++)
+//     {
+
+//         float delta_layer;
+//         if (is_output_layer == 1)
+//         {
+//             float delta_E_delta_a = derivative_delta_E_delta_a(neural, layers, layers_size, target, target_index, neuron_index);
+//             delta_layer = delta_E_delta_a;
+//         }
+//         else
+//         {
+//             delta_layer = sum_next_delta_layer;
+//         }
+//         float delta_a_delta_net = derivative_delta_a_delta_net(neural, layers, layer_index, neuron_index);
+//         delta_layer = delta_layer * delta_a_delta_net;
+
+//         int delta_bias_p = delta_bias_position(layers, layer_index);
+//         float previous_delta_bias = *(neural + delta_bias_p + neuron_index);
+//         float delta_bias = -learning_rate * delta_layer * 1 + momentum * previous_delta_bias;
+//         int bias_p = bias_position(layers, layer_index);
+//         float bias = *(neural + bias_p + neuron_index);
+//         bias = bias + delta_bias;
+//         *(neural + bias_p + neuron_index) = bias;
+//         *(neural + delta_bias_p + neuron_index) = delta_bias;
+
+
+//         for(int previous_layer_neuron_index = 0; previous_layer_neuron_index < previous_layer_neurons; previous_layer_neuron_index++)
+//         {
+//             int delta_w_p = delta_w_position(layers, layer_index, previous_layer_neuron_index, neuron_index);
+//             float previous_delta_w = *(neural + delta_w_p);
+//             float delta_net_delta_w = derivative_delta_net_delta_w(neural, layers, layer_index, previous_layer_neuron_index);
+//             float delta_w = -learning_rate * delta_layer * delta_net_delta_w + momentum * previous_delta_w;
+//             int w_p = w_position(layers, layer_index, previous_layer_neuron_index, neuron_index);
+//             float w = *(neural + w_p);
+//             w = w + delta_w;
+//             *(neural + w_p) = w;
+//             *(neural + delta_w_p) = delta_w;
+//         }
+
+
+
+//         float delta_net_delta_a = derivative_delta_net_delta_a(neural, layers, layer_index, previous_layer_neuron_index, neuron_index);
+//         sum_delta_layer += delta_layer * delta_net_delta_a;
+//     }
+
+//     return sum_delta_layer;
+// }
+
+int main(int argument_count, char **arguments)
+{
 
     struct arguments args = load_arguments(argument_count, arguments);
     float *data_initializer = NULL;
@@ -574,18 +711,18 @@ int main(int argument_count, char **arguments){
     int targets_size = load_input(targets, args.target_file_path, args.target_length);
     int target_length = args.target_length;
 
-    for(int i = 0; i < targets_size; i++){
+    for (int i = 0; i < targets_size; i++)
+    {
         float target = *(*targets + i);
     }
 
     int const layers_size = args.layers_size;
     int layers[layers_size];
 
-    for(int i = 0; i < layers_size; i++){
+    for (int i = 0; i < layers_size; i++)
+    {
         layers[i] = *(args.layers + i);
     }
-    
-
 
     float LEARNING_RATE = 0.9;
     float MOMENTUM = 0.2;
@@ -594,7 +731,6 @@ int main(int argument_count, char **arguments){
     float *neural = malloc(neural_size * sizeof(float));
 
     initialize(neural, layers, layers_size);
-    // initialize_with_debugable_values(neural, layers);
 
     int const MAX_EPOCHS = 1000;
     int const FIRST_LAYER_INDEX = 0;
@@ -605,30 +741,17 @@ int main(int argument_count, char **arguments){
     {
         for (int sample_index = 0; sample_index < samples_size; sample_index += sample_length)
         {
-            int target_index = sample_index/sample_length;
+            int target_index = sample_index / sample_length;
 
             feed_forward(neural, layers, FIRST_LAYER_INDEX, layers_size, data, sample_index, sample_length);
 
-            int layers_exit_check[layers_size];
-            for(int layer = 0; layer < layers_size; layer++){
-                layers_exit_check[layer] = 0;
-            }
+            call_backpropagation_first_to_last(neural, layers, layers_size, targets, target_index, LEARNING_RATE, MOMENTUM);
 
-            // int neuron_index_layer_zero = 0;
-            // backpropagate_2_3_1(neural, layers, layers_size, 0, target, target_index, LEARNING_RATE, MOMENTUM, neuron_index_layer_zero);
-            int const LAYER_INDEX = 1;
-            for(int neuron_index_layer_zero = 0; neuron_index_layer_zero < layers[0]; neuron_index_layer_zero++){
-                backpropagate(neural, layers, layers_size, LAYER_INDEX, targets, target_index, LEARNING_RATE, MOMENTUM, neuron_index_layer_zero, layers_exit_check);    
-            }
-
-            if(counter % 10 == 0){
+            if (counter % 1 == 0)
+            {
                 show_results(neural, data, targets, layers, layers_size, sample_index, sample_length, counter, epoch);
             }
-            
- 
-
             counter++;
-
         }
     }
 }
