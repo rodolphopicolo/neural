@@ -81,6 +81,19 @@
             "externalConsole": false,
             "MIMode": "lldb",
             "preLaunchTask": "C/C++: gcc arquivo de build ativo"
+        } 
+        ,{
+            "name": "Lamps Gen 1-1000-921600",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${fileDirname}/${fileBasenameNoExtension}",
+            "args": ["./resource/dataset/target.bin", "1", "./resource/dataset/dataset.bin", "921600", "1,1000,921600"],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "preLaunchTask": "C/C++: gcc arquivo de build ativo"
         }     
     ]
 }
