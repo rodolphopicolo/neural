@@ -541,7 +541,7 @@ void show_results(float *neural, float **data, float **targets, int layers[], in
 {
     printf("\nCounter %d. Epoch %d. Sample [", counter, epoch);
 
-    for(int i = 0; i < sample_length && i < 4; i++){
+    for(int i = 0; i < sample_length && i < 10; i++){
         float value = *(*data + sample_index + i);
         if(i > 0){
             printf(", ");
@@ -549,7 +549,7 @@ void show_results(float *neural, float **data, float **targets, int layers[], in
         printf("%.0f", value);
     }
     printf("]. Target [");
-    for(int neuron = 0; neuron < layers[layers_size - 1]; neuron++){
+    for(int neuron = 0; neuron < layers[layers_size - 1] && neuron < 10; neuron++){
         float t = *(*targets + (sample_index / sample_length) + neuron);
         if(neuron > 0){
             printf(", ");
@@ -558,7 +558,7 @@ void show_results(float *neural, float **data, float **targets, int layers[], in
     }
     const int a_p = a_position(layers, layers_size - 1);
     printf("]. Activation [");
-    for(int neuron = 0; neuron < layers[layers_size - 1]; neuron++){
+    for(int neuron = 0; neuron < layers[layers_size - 1] && neuron < 10; neuron++){
         float a = *(neural + a_p + neuron);
         if(neuron > 0){
             printf(", ");
@@ -566,7 +566,7 @@ void show_results(float *neural, float **data, float **targets, int layers[], in
         printf("%.7f", a);
     }
     printf("]. Diff [");
-    for(int neuron = 0; neuron < layers[layers_size - 1]; neuron++){
+    for(int neuron = 0; neuron < layers[layers_size - 1] && neuron < 10; neuron++){
         float a = *(neural + a_p + neuron);
         float t = *(*targets + (sample_index / sample_length) + neuron);
         if(neuron > 0){
@@ -579,16 +579,18 @@ void show_results(float *neural, float **data, float **targets, int layers[], in
         printf("%.3f", diff);
     }
     printf("]. Error [");
-    for(int neuron = 0; neuron < layers[layers_size - 1]; neuron++){
+    float sum_error = 0;
+    for(int neuron = 0; neuron < layers[layers_size - 1] && neuron < 10; neuron++){
         float a = *(neural + a_p + neuron);
         float t = *(*targets + (sample_index / sample_length) + neuron);
         if(neuron > 0){
             printf(", ");
         }
         float error = pow((t-a),2)/2;
+        sum_error += error;
         printf("%.7f", error);
     }
-    printf("]");
+    printf("]. Total error %.7f", sum_error);
 
     // long ch2 = checkpoint();
 
