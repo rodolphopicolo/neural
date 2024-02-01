@@ -539,36 +539,61 @@ int load_input(float **data, char *file_path, int sample_length_float)
 
 void show_results(float *neural, float **data, float **targets, int layers[], int layers_size, int sample_index, int sample_length, int target_length, int counter, int epoch, long ch0, long ch1)
 {
-    printf("\nCounter %d. Epoch %d. Sample [", counter, epoch);
+    printf("\nCounter %4d. Epoch %4d. Sample [", counter, epoch);
 
-    for(int i = 0; i < sample_length && i < 10; i++){
+    for(int i = 0; i < sample_length && i < 16; i++){
         float value = *(*data + sample_index + i);
         if(i > 0){
             printf(", ");
         }
         printf("%.0f", value);
     }
-    printf("]. Target [");
-    for(int neuron = 0; neuron < layers[layers_size - 1] && neuron < 10; neuron++){
-        float t = *(*targets + (sample_index / sample_length) + neuron);
+    float match_value;
+    printf("]======================================\nTarget     [");
+    int activated_neuron = -1;
+    int target_index = sample_index / sample_length;
+    for(int neuron = 0; neuron < layers[layers_size - 1] && neuron < 16; neuron++){
+
+        // float t = *(*targets + sample_index * target_length + neuron_index);
+
+        float t = *(*targets + target_index * target_length + neuron);
         if(neuron > 0){
             printf(", ");
         }
-        printf("%.3f", t);
+        if(t == 1){
+            match_value = t;
+            activated_neuron = neuron;
+            printf("\x1b[32;40m%.5f\x1b[0m", t);
+
+        } else {
+            printf("%.5f", t);
+        }
+        
     }
     const int a_p = a_position(layers, layers_size - 1);
-    printf("]. Activation [");
-    for(int neuron = 0; neuron < layers[layers_size - 1] && neuron < 10; neuron++){
+
+    printf("] \x1b[32;40m%.5f\x1b[0m  \nActivation [", match_value);
+
+    for(int neuron = 0; neuron < layers[layers_size - 1] && neuron < 16; neuron++){
         float a = *(neural + a_p + neuron);
         if(neuron > 0){
             printf(", ");
         }
-        printf("%.7f", a);
+        if(neuron == activated_neuron){
+            match_value = a;
+            printf("\x1b[32;40m%.5f\x1b[0m", a);
+
+        } else {
+            printf("%.5f", a);
+        }
     }
-    printf("]. Diff [");
-    for(int neuron = 0; neuron < layers[layers_size - 1] && neuron < 10; neuron++){
+
+    printf("] \x1b[32;40m%.5f\x1b[0m  \nDiff       [", match_value);
+
+
+    for(int neuron = 0; neuron < layers[layers_size - 1] && neuron < 16; neuron++){
         float a = *(neural + a_p + neuron);
-        float t = *(*targets + (sample_index / sample_length) + neuron);
+        float t = *(*targets + target_index * target_length + neuron);
         if(neuron > 0){
             printf(", ");
         }
@@ -576,21 +601,36 @@ void show_results(float *neural, float **data, float **targets, int layers[], in
         if(diff < 0){
             diff = -diff;
         }
-        printf("%.3f", diff);
+        if(neuron == activated_neuron){
+            match_value = diff;
+            printf("\x1b[32;40m%.5f\x1b[0m", diff);
+        } else {
+            printf("%.5f", diff);
+        }
     }
-    printf("]. Error [");
+
+    printf("] \x1b[32;40m%.5f\x1b[0m  \nError      [", match_value);
+
     float sum_error = 0;
-    for(int neuron = 0; neuron < layers[layers_size - 1] && neuron < 10; neuron++){
+    for(int neuron = 0; neuron < layers[layers_size - 1] && neuron < 16; neuron++){
         float a = *(neural + a_p + neuron);
-        float t = *(*targets + (sample_index / sample_length) + neuron);
+        float t = *(*targets + target_index * target_length + neuron);
         if(neuron > 0){
             printf(", ");
         }
         float error = pow((t-a),2)/2;
         sum_error += error;
-        printf("%.7f", error);
+        if(neuron == activated_neuron){
+            match_value = error;
+            printf("\x1b[32;40m%.5f\x1b[0m", error);
+
+        } else {
+            printf("%.5f", error);
+        }
     }
-    printf("]. Total error %.7f", sum_error);
+
+    printf("] \x1b[32;40m%.5f\x1b[0m              Total error \x1b[32;40m%.5f\x1b[0m", match_value, sum_error);
+
 
     // long ch2 = checkpoint();
 
@@ -758,7 +798,19 @@ void initialize_with_debugable_values_xor_2_3_1(float *neural, int layers[])
 void calculate_delta_last_layer(float *neural, int layers[], int layers_size, float **targets, int target_index){
     int layer_index = layers_size - 1;
     int neurons = layers[layer_index];
+
+    printf("\nLast layer: ===============================\n");
+    int target_length = layers[layers_size - 1];
+
     for(int neuron_index = 0; neuron_index < neurons; neuron_index++){
+
+            float t = *(*targets + target_index * target_length + neuron_index);
+            if(neuron_index > 0){
+                printf(", ");
+            }
+            printf("%.0f", t);
+
+
             float delta_E_delta_a = derivative_delta_E_delta_a(neural, layers, layers_size, targets, target_index, neuron_index);
             float delta_a_delta_net = derivative_delta_a_delta_net(neural, layers, layer_index, neuron_index);
             float delta = delta_E_delta_a * delta_a_delta_net;
@@ -954,17 +1006,17 @@ int main(int argument_count, char **arguments)
         layers[i] = *(args.layers + i);
     }
 
-    float LEARNING_RATE = 0.2;
-    float MOMENTUM = 0.95;
+    float LEARNING_RATE = 0.45;
+    float MOMENTUM = 0.8;
 
     int neural_size = calculate_size(layers, layers_size);
     float *neural = malloc(neural_size * sizeof(float));
 
-    // initialize(neural, layers, layers_size);
+    initialize(neural, layers, layers_size);
     // initialize_with_debugable_values_xor_2_3_1(neural, layers);
-    initialize_with_debugable_values_xor_and_2_3_2(neural, layers);
+    // initialize_with_debugable_values_xor_and_2_3_2(neural, layers);
 
-    int const MAX_EPOCHS = 370;
+    int const MAX_EPOCHS = 10000;
     int const FIRST_LAYER_INDEX = 0;
     int const LAST_LAYER_INDEX = layers_size - 1;
 
@@ -982,15 +1034,12 @@ int main(int argument_count, char **arguments)
             backpropagate_last_to_first_2(neural, layers, layers_size, layer_index, targets, target_index, LEARNING_RATE, MOMENTUM);
             // call_backpropagation_first_to_last(neural, layers, layers_size, targets, target_index, LEARNING_RATE, MOMENTUM);
 
-
-            
-
             if (counter % 1 == 0)
             {
-                save(neural, neural_size);
                 show_results(neural, data, targets, layers, layers_size, sample_index, sample_length, target_length, counter, epoch, ch0, ch1);
             }
             counter++;
         }
+        save(neural, neural_size);
     }
 }

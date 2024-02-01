@@ -44,11 +44,11 @@
             "preLaunchTask": "C/C++: gcc arquivo de build ativo"
         }
         ,{
-            "name": "Lamps 921600-3-1",
+            "name": "Lamps 921600-3-11",
             "type": "cppdbg",
             "request": "launch",
             "program": "${fileDirname}/${fileBasenameNoExtension}",
-            "args": ["./resource/dataset/dataset.bin", "921600", "./resource/dataset/target.bin", "1", "921600,3,1"],
+            "args": ["./resource/dataset/dataset.bin", "921600", "./resource/dataset/target.bin", "11", "921600,3,11"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
@@ -57,11 +57,11 @@
             "preLaunchTask": "C/C++: gcc arquivo de build ativo"
         }
         ,{
-            "name": "Lamps 921600-9-1",
+            "name": "Lamps 921600-9-11",
             "type": "cppdbg",
             "request": "launch",
             "program": "${fileDirname}/${fileBasenameNoExtension}",
-            "args": ["./resource/dataset/dataset.bin", "921600", "./resource/dataset/target.bin", "1", "921600,9,1"],
+            "args": ["./resource/dataset/dataset.bin", "921600", "./resource/dataset/target.bin", "1", "921600,9,11"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
