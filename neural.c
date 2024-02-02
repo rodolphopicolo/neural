@@ -416,6 +416,8 @@ struct arguments
     int target_length;
     int *layers;
     int layers_size;
+    float learning_rate;
+    float momentum;
 };
 
 struct arguments load_arguments(int argument_count, char **arguments)
@@ -437,24 +439,27 @@ struct arguments load_arguments(int argument_count, char **arguments)
         }
         else if (i == 2)
         {
-            args.sample_length = strtol(arg, &string_part, BASE);
-        }
-        else if (i == 3)
-        {
             args.target_file_path = arg;
         }
-        else if (i == 4)
-        {
-            args.target_length = strtol(arg, &string_part, BASE);
-        }
-        else if (i == 5)
+        else if (i == 3)
         {
             int *initializer = NULL;
             int **layers = &initializer;
             args.layers_size = load_layers(arg, layers);
             args.layers = *layers;
+        } 
+        else if (i == 4)
+        {
+            args.learning_rate = strtof(arg, &string_part);
         }
+        else if (i == 5)
+        {
+            args.momentum = strtof(arg, &string_part);
+        }
+
     }
+    args.sample_length = args.layers[0];
+    args.target_length = args.layers[args.layers_size - 1];
     return args;
 }
 
@@ -1006,9 +1011,6 @@ int main(int argument_count, char **arguments)
         layers[i] = *(args.layers + i);
     }
 
-    float LEARNING_RATE = 0.45;
-    float MOMENTUM = 0.8;
-
     int neural_size = calculate_size(layers, layers_size);
     float *neural = malloc(neural_size * sizeof(float));
 
@@ -1016,7 +1018,7 @@ int main(int argument_count, char **arguments)
     // initialize_with_debugable_values_xor_2_3_1(neural, layers);
     // initialize_with_debugable_values_xor_and_2_3_2(neural, layers);
 
-    int const MAX_EPOCHS = 10000;
+    int const MAX_EPOCHS = 1000;
     int const FIRST_LAYER_INDEX = 0;
     int const LAST_LAYER_INDEX = layers_size - 1;
 
@@ -1031,7 +1033,7 @@ int main(int argument_count, char **arguments)
             feed_forward(neural, layers, FIRST_LAYER_INDEX, layers_size, data, sample_index, sample_length);
             long ch1 = checkpoint();
             int layer_index = layers_size - 1;
-            backpropagate_last_to_first_2(neural, layers, layers_size, layer_index, targets, target_index, LEARNING_RATE, MOMENTUM);
+            backpropagate_last_to_first_2(neural, layers, layers_size, layer_index, targets, target_index, args.learning_rate, args.momentum);
             // call_backpropagation_first_to_last(neural, layers, layers_size, targets, target_index, LEARNING_RATE, MOMENTUM);
 
             if (counter % 1 == 0)
@@ -1040,6 +1042,6 @@ int main(int argument_count, char **arguments)
             }
             counter++;
         }
-        save(neural, neural_size);
+        // save(neural, neural_size);
     }
 }
