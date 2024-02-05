@@ -44,7 +44,7 @@
             "preLaunchTask": "C/C++: gcc arquivo de build ativo"
         }
         ,{
-            "name": "Lamps 921600-3-11",
+            "name": "Lamps 921600-3-10",
             "type": "cppdbg",
             "request": "launch",
             "program": "${fileDirname}/${fileBasenameNoExtension}",
